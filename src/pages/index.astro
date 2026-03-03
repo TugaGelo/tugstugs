@@ -1,37 +1,58 @@
 ---
-import { getLibrary } from '../lib/r2';
+import MainLayout from '../layouts/MainLayout.astro';
+import { getLibrary } from '../lib/r2.ts';
+
 const songs = await getLibrary();
 ---
 
-<html lang="en">
-    <head>
-        <meta charset="utf-8" />
-        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-        <meta name="viewport" content="width=device-width" />
-        <meta name="generator" content={Astro.generator} />
-        <title>TugsTugs | Library Test</title>
-    </head>
-    <body style="background: #121212; color: white; font-family: sans-serif; padding: 2rem;">
-        <h1 style="font-size: 3rem; font-weight: 900;">TUGSTUGS</h1>
-        <p style="color: #a1a1aa; margin-bottom: 2rem;">Connectivity Test: Checking R2 Bucket...</p>
+<MainLayout>
+  <div style="max-width: 800px; margin: 0 auto; padding: 2rem; color: white; font-family: sans-serif;">
+    <h1 style="font-size: 3rem; font-weight: 900; margin-bottom: 2rem;">TUGSTUGS LIBRARY</h1>
 
-        <div style="display: grid; gap: 1rem;">
-            {songs.length > 0 ? (
-                songs.map((song) => (
-                    <div style="background: #1e1e1e; padding: 1rem; border-radius: 8px; border: 1px solid #333;">
-                        <strong>🎵 {song}</strong>
-                    </div>
-                ))
-            ) : (
-                <div style="color: #ef4444; padding: 1rem; border: 1px dashed #ef4444;">
-                    <p>No songs found! Check your:</p>
-                    <ul style="font-size: 0.8rem;">
-                        <li>.env keys (Account ID, Secret Key, etc.)</li>
-                        <li>Bucket name in .env (must be tugstugs-library)</li>
-                        <li>Cloudflare dashboard (make sure you uploaded an .mp3)</li>
-                    </ul>
-                </div>
-            )}
-        </div>
-    </body>
-</html>
+    <div style="display: flex; flex-direction: column; gap: 1rem;">
+      {songs.length > 0 ? (
+        songs.map((song) => (
+          <div style="background: #1e1e1e; padding: 1rem 1.5rem; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333;">
+            
+            <div>
+              <strong style="display: block; font-size: 1.2rem; margin-bottom: 0.2rem;">{song.title}</strong>
+              <span style="color: #a1a1aa; font-size: 0.8rem; text-transform: uppercase;">{song.path.split('/')[0]}</span>
+            </div>
+            
+            <button 
+              class="play-btn"
+              data-path={song.path}
+              data-title={song.title}
+              style="background: white; color: black; border: none; padding: 0.5rem 1.5rem; border-radius: 20px; font-weight: bold; cursor: pointer; transition: transform 0.1s;"
+              onmouseover="this.style.transform='scale(1.05)'"
+              onmouseout="this.style.transform='scale(1)'"
+            >
+              PLAY
+            </button>
+            
+          </div>
+        ))
+      ) : (
+        <p style="color: #a1a1aa; font-style: italic;">No songs found in the bucket.</p>
+      )}
+    </div>
+  </div>
+</MainLayout>
+
+<script>
+  import { currentSong, currentTitle } from '../lib/store.ts';
+
+  const buttons = document.querySelectorAll('.play-btn');
+
+  buttons.forEach(button => {
+    button.addEventListener('click', () => {
+      const path = button.getAttribute('data-path');
+      const title = button.getAttribute('data-title');
+      
+      if (path && title) {
+        currentSong.set(path);
+        currentTitle.set(title);
+      }
+    });
+  });
+</script>
