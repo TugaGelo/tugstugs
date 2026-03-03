@@ -1,17 +1,37 @@
 ---
-
+import { getLibrary } from '../lib/r2';
+const songs = await getLibrary();
 ---
 
 <html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
+    <head>
+        <meta charset="utf-8" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <meta name="viewport" content="width=device-width" />
+        <meta name="generator" content={Astro.generator} />
+        <title>TugsTugs | Library Test</title>
+    </head>
+    <body style="background: #121212; color: white; font-family: sans-serif; padding: 2rem;">
+        <h1 style="font-size: 3rem; font-weight: 900;">TUGSTUGS</h1>
+        <p style="color: #a1a1aa; margin-bottom: 2rem;">Connectivity Test: Checking R2 Bucket...</p>
+
+        <div style="display: grid; gap: 1rem;">
+            {songs.length > 0 ? (
+                songs.map((song) => (
+                    <div style="background: #1e1e1e; padding: 1rem; border-radius: 8px; border: 1px solid #333;">
+                        <strong>🎵 {song}</strong>
+                    </div>
+                ))
+            ) : (
+                <div style="color: #ef4444; padding: 1rem; border: 1px dashed #ef4444;">
+                    <p>No songs found! Check your:</p>
+                    <ul style="font-size: 0.8rem;">
+                        <li>.env keys (Account ID, Secret Key, etc.)</li>
+                        <li>Bucket name in .env (must be tugstugs-library)</li>
+                        <li>Cloudflare dashboard (make sure you uploaded an .mp3)</li>
+                    </ul>
+                </div>
+            )}
+        </div>
+    </body>
 </html>
