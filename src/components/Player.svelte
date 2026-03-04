@@ -7,7 +7,7 @@
   let paused = true;
   let time = 0;
   let duration = 0;
-  let volume = 1; // 1 = 100% volume
+  let volume = 1;
 
   function formatTime(sec) {
     if (isNaN(sec)) return "0:00";
@@ -16,7 +16,6 @@
     return `${minutes}:${seconds}`;
   }
 
-  // --- NEW LOGIC: Next / Prev ---
   function playNext() {
     if ($currentIndex < $playlist.length - 1) {
       const nextIdx = $currentIndex + 1;

@@ -18,5 +18,8 @@
     "svelte": "^5.53.6",
     "tailwindcss": "^4.2.1",
     "typescript": "^5.9.3"
+  },
+  "devDependencies": {
+    "@types/jsmediatags": "^3.9.6"
   }
 }
