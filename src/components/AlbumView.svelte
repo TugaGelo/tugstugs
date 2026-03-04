@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { getTrackMetadata } from '../lib/metadata';
   import { PUBLIC_BUCKET_URL } from 'astro:env/client';
   import { currentSong, currentTitle, currentIndex, playlist, browsingCover, isPlaying } from '../lib/store';
@@ -11,7 +11,7 @@
   let coverUrl = null;
   let albumArtist = "";
   let isLoading = true;
-  let pageRgb = '30, 30, 36'; 
+  let pageRgb = '234, 84, 85';
 
   onMount(async () => {
     const promises = rawPaths.map(async (path) => {
@@ -41,32 +41,53 @@
     if (firstValid) {
       coverUrl = firstValid.cover;
       albumArtist = tracks.find(t => t.artist !== "Unknown Artist")?.artist || "Unknown Artist";
-      extractAlbumColor(coverUrl); 
+      extractVibrantColor(coverUrl); 
     }
 
     browsingCover.set(coverUrl); 
     isLoading = false;
   });
 
-  function extractAlbumColor(imgSrc) {
+  onDestroy(() => {
+    browsingCover.set(null);
+  });
+
+  function extractVibrantColor(imgSrc) {
     const img = new Image();
     img.crossOrigin = "Anonymous";
     img.onload = () => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
-      canvas.width = 1; canvas.height = 1;
-      ctx.drawImage(img, 0, 0, 1, 1);
-      const [rawR, rawG, rawB] = ctx.getImageData(0, 0, 1, 1).data;
-      
-      const brightness = (rawR * 299 + rawG * 587 + rawB * 114) / 1000;
-      let r = rawR, g = rawG, b = rawB;
-      if (brightness < 60) {
-        const boost = 60 - brightness; 
-        r = Math.min(255, Math.floor(rawR + boost));
-        g = Math.min(255, Math.floor(rawG + boost));
-        b = Math.min(255, Math.floor(rawB + boost));
+      canvas.width = 64; canvas.height = 64;
+      ctx.drawImage(img, 0, 0, 64, 64);
+      const data = ctx.getImageData(0, 0, 64, 64).data;
+
+      let maxScore = -1;
+      let bestR, bestG, bestB;
+
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i], g = data[i+1], b = data[i+2];
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        
+        const sat = max === 0 ? 0 : (max - min) / max;
+        const luma = (r * 299 + g * 587 + b * 114) / 1000;
+        const score = (sat * 100) - Math.abs(luma - 127) * 0.5;
+
+        if (score > maxScore) {
+          maxScore = score;
+          bestR = r; bestG = g; bestB = b;
+        }
       }
-      pageRgb = `${r}, ${g}, ${b}`;
+
+      const finalLuma = (bestR * 299 + bestG * 587 + bestB * 114) / 1000;
+      if (finalLuma < 100) {
+        const boost = 100 - finalLuma; 
+        bestR = Math.min(255, Math.floor(bestR + boost));
+        bestG = Math.min(255, Math.floor(bestG + boost));
+        bestB = Math.min(255, Math.floor(bestB + boost));
+      }
+      pageRgb = `${bestR}, ${bestG}, ${bestB}`;
     };
     img.src = imgSrc;
   }
@@ -76,13 +97,7 @@
       $isPlaying = !$isPlaying;
       return;
     }
-
-    playlist.set(tracks.map(t => ({ 
-      path: t.path, 
-      title: t.title,
-      cover: t.cover || coverUrl 
-    })));
-
+    playlist.set(tracks.map(t => ({ path: t.path, title: t.title, cover: t.cover || coverUrl })));
     currentSong.set(tracks[index].path);
     currentTitle.set(tracks[index].title);
     currentIndex.set(index);
@@ -138,13 +153,16 @@
           class="group flex items-center w-full p-3 hover:bg-white/10 rounded-xl transition-colors text-left cursor-pointer border border-transparent hover:border-white/5"
         >
           <div class="w-10 flex-shrink-0 text-center text-gray-400 font-medium relative h-6">
-            <span class={`group-hover:hidden text-xs absolute inset-0 flex items-center justify-center ${track.path === $currentSong ? 'text-[#EA5455] font-black' : ''}`}>
+            <span 
+              class={`group-hover:hidden text-xs absolute inset-0 flex items-center justify-center ${track.path === $currentSong ? 'font-black' : ''}`}
+              style={track.path === $currentSong ? `color: rgb(${pageRgb});` : ''}
+            >
               {index + 1}
             </span>
             
             <div class="hidden group-hover:flex absolute inset-0 items-center justify-center text-white">
               {#if track.path === $currentSong && $isPlaying}
-                <svg viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                <svg viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5" style={`color: rgb(${pageRgb});`}><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
               {:else}
                 <svg viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 ml-0.5"><path d="M8 5v14l11-7z"/></svg>
               {/if}
@@ -152,7 +170,10 @@
           </div>
 
           <div class="flex-1 overflow-hidden pr-4 ml-2">
-            <div class={`font-bold truncate group-hover:text-white transition-colors ${track.path === $currentSong ? 'text-[#EA5455]' : 'text-gray-100'}`}>
+            <div 
+              class={`font-bold truncate group-hover:text-white transition-colors ${track.path === $currentSong ? '' : 'text-gray-100'}`}
+              style={track.path === $currentSong ? `color: rgb(${pageRgb}); text-shadow: 0 0 10px rgba(${pageRgb}, 0.3);` : ''}
+            >
               {track.title}
             </div>
             <div class="text-sm text-gray-400 truncate mt-0.5">{track.artist}</div>

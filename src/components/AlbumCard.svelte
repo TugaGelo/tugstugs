@@ -11,6 +11,7 @@
   let coverUrl = null;
   let artist = "Loading...";
   let isLoadingPlay = false;
+  let cardRgb = '234, 84, 85'; 
 
   $: isActiveAlbum = rawPaths.includes($currentSong);
 
@@ -18,19 +19,55 @@
     try {
       const url = `${PUBLIC_BUCKET_URL}/${firstSongPath}`;
       const data = await getTrackMetadata(url);
-      if (data.cover) coverUrl = data.cover;
+      if (data.cover) {
+        coverUrl = data.cover;
+        extractVibrantColor(coverUrl);
+      }
       artist = data.artist !== "Unknown Artist" ? data.artist : "Unknown Artist";
     } catch (e) {
       artist = "Unknown Artist";
     }
   });
 
-  async function handleQuickPlay() {
-    if (isActiveAlbum) {
-      $isPlaying = !$isPlaying;
-      return;
-    }
+  function extractVibrantColor(imgSrc) {
+    const img = new Image();
+    img.crossOrigin = "Anonymous";
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = 64; canvas.height = 64;
+      ctx.drawImage(img, 0, 0, 64, 64);
+      const data = ctx.getImageData(0, 0, 64, 64).data;
+      let maxScore = -1;
+      let bestR, bestG, bestB;
 
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i], g = data[i+1], b = data[i+2];
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        const sat = max === 0 ? 0 : (max - min) / max;
+        const luma = (r * 299 + g * 587 + b * 114) / 1000;
+        const score = (sat * 100) - Math.abs(luma - 127) * 0.5;
+
+        if (score > maxScore) {
+          maxScore = score; bestR = r; bestG = g; bestB = b;
+        }
+      }
+
+      const finalLuma = (bestR * 299 + bestG * 587 + bestB * 114) / 1000;
+      if (finalLuma < 100) {
+        const boost = 100 - finalLuma; 
+        bestR = Math.min(255, Math.floor(bestR + boost));
+        bestG = Math.min(255, Math.floor(bestG + boost));
+        bestB = Math.min(255, Math.floor(bestB + boost));
+      }
+      cardRgb = `${bestR}, ${bestG}, ${bestB}`;
+    };
+    img.src = imgSrc;
+  }
+
+  async function handleQuickPlay() {
+    if (isActiveAlbum) { $isPlaying = !$isPlaying; return; }
     if (isLoadingPlay || rawPaths.length === 0) return;
     isLoadingPlay = true;
 
@@ -64,13 +101,11 @@
     currentTitle.set(finalPlaylist[0].title);
     currentIndex.set(0);
     $isPlaying = true;
-
     isLoadingPlay = false;
   }
 </script>
 
 <a href={`/album/${albumName}`} class="group relative flex flex-col cursor-pointer transition-transform hover:-translate-y-1">
-  
   <div class="w-full aspect-square rounded-xl bg-white/5 shadow-lg overflow-hidden relative mb-3 border border-white/5 group-hover:shadow-2xl transition-all">
     {#if coverUrl}
       <img src={coverUrl} alt="Cover" class="w-full h-full object-cover" />
@@ -80,7 +115,8 @@
 
     <button 
       on:click|preventDefault|stopPropagation={handleQuickPlay}
-      class="absolute bottom-3 right-3 w-12 h-12 flex items-center justify-center rounded-full bg-[#EA5455] text-white shadow-xl translate-y-2 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 hover:scale-105 transition-all duration-300 z-20"
+      class="absolute bottom-3 right-3 w-12 h-12 flex items-center justify-center rounded-full text-white shadow-xl translate-y-2 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 hover:scale-105 transition-all duration-300 z-20"
+      style={`background-color: rgb(${cardRgb}); box-shadow: 0 4px 15px rgba(${cardRgb}, 0.5);`}
       disabled={isLoadingPlay && !isActiveAlbum}
     >
       {#if isLoadingPlay && !isActiveAlbum}

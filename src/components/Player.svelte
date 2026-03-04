@@ -16,7 +16,7 @@
   let isDragging = false;
   let isTransitioning = false;
 
-  let playerRgb = '30, 30, 36'; 
+  let playerRgb = '234, 84, 85'; 
   let playingCover = null; 
 
   $: if ($currentSong && $currentSong !== playingPath) {
@@ -33,19 +33,33 @@
     img.onload = () => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
-      canvas.width = 1; canvas.height = 1;
-      ctx.drawImage(img, 0, 0, 1, 1);
-      const [rawR, rawG, rawB] = ctx.getImageData(0, 0, 1, 1).data;
-      
-      const brightness = (rawR * 299 + rawG * 587 + rawB * 114) / 1000;
-      let r = rawR, g = rawG, b = rawB;
-      if (brightness < 100) {
-        const boost = 100 - brightness; 
-        r = Math.min(255, Math.floor(rawR + boost));
-        g = Math.min(255, Math.floor(rawG + boost));
-        b = Math.min(255, Math.floor(rawB + boost));
+      canvas.width = 64; canvas.height = 64;
+      ctx.drawImage(img, 0, 0, 64, 64);
+      const data = ctx.getImageData(0, 0, 64, 64).data;
+      let maxScore = -1;
+      let bestR, bestG, bestB;
+
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i], g = data[i+1], b = data[i+2];
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        const sat = max === 0 ? 0 : (max - min) / max;
+        const luma = (r * 299 + g * 587 + b * 114) / 1000;
+        const score = (sat * 100) - Math.abs(luma - 127) * 0.5;
+
+        if (score > maxScore) {
+          maxScore = score; bestR = r; bestG = g; bestB = b;
+        }
       }
-      playerRgb = `${r}, ${g}, ${b}`;
+
+      const finalLuma = (bestR * 299 + bestG * 587 + bestB * 114) / 1000;
+      if (finalLuma < 100) {
+        const boost = 100 - finalLuma; 
+        bestR = Math.min(255, Math.floor(bestR + boost));
+        bestG = Math.min(255, Math.floor(bestG + boost));
+        bestB = Math.min(255, Math.floor(bestB + boost));
+      }
+      playerRgb = `${bestR}, ${bestG}, ${bestB}`;
     };
     img.src = themeCover;
   }
@@ -63,18 +77,15 @@
   function playExplicitTrack(index) {
     if (index === undefined || index === null || !$playlist[index]) return;
     const url = `${PUBLIC_BUCKET_URL}/${$playlist[index].path}`;
-    
     if (audioA) { audioA.pause(); audioA.currentTime = 0; }
     if (audioB) { audioB.pause(); audioB.currentTime = 0; }
-    
     activeDeck = 'A'; 
-    
     setTimeout(() => {
         if (audioA) {
             audioA.src = url;
             audioA.play().catch(e => console.error(e));
             paused = false;
-            $isPlaying = true;
+            $isPlaying = true; 
         }
         preloadNext(index, 'A');
     }, 0);
@@ -84,13 +95,8 @@
     const nextIdx = currentIdx + 1;
     if (nextIdx < $playlist.length) {
       const nextUrl = `${PUBLIC_BUCKET_URL}/${$playlist[nextIdx].path}`;
-      if (active === 'A' && audioB) {
-        audioB.src = nextUrl;
-        audioB.load(); 
-      } else if (active === 'B' && audioA) {
-        audioA.src = nextUrl;
-        audioA.load();
-      }
+      if (active === 'A' && audioB) { audioB.src = nextUrl; audioB.load(); } 
+      else if (active === 'B' && audioA) { audioA.src = nextUrl; audioA.load(); }
     }
   }
 
@@ -127,9 +133,7 @@
     setTimeout(() => { isTransitioning = false; }, 1000); 
   }
 
-  function togglePause() {
-    $isPlaying = !$isPlaying;
-  }
+  function togglePause() { $isPlaying = !$isPlaying; }
 
   function playNext() {
     if ($currentIndex < $playlist.length - 1) {
@@ -169,7 +173,6 @@
   class="fixed bottom-0 left-0 w-full p-4 md:p-6 flex flex-col items-center justify-between z-50 transition-all duration-1000 border-t border-white/10 backdrop-blur-2xl"
   style={`background: linear-gradient(180deg, rgba(${playerRgb}, 0.15) 0%, rgba(20, 20, 24, 0.95) 100%); box-shadow: 0 -20px 60px rgba(${playerRgb}, 0.15); border-top-color: rgba(${playerRgb}, 0.6);`}
 >
-  
   <audio bind:this={audioA} preload="auto" on:timeupdate={handleTimeUpdate} on:play={() => { paused = false; $isPlaying = true; }} on:pause={() => { paused = true; $isPlaying = false; }} class="hidden"></audio>
   <audio bind:this={audioB} preload="auto" on:timeupdate={handleTimeUpdate} on:play={() => { paused = false; $isPlaying = true; }} on:pause={() => { paused = true; $isPlaying = false; }} class="hidden"></audio>
 
@@ -193,11 +196,11 @@
 
         <button 
           on:click={togglePause} 
-          class="w-12 h-12 flex items-center justify-center rounded-full text-black hover:scale-105 transition-transform shadow-md cursor-pointer"
+          class="w-12 h-12 flex items-center justify-center rounded-full text-white hover:scale-105 transition-transform shadow-md cursor-pointer"
           style={`background-color: rgb(${playerRgb}); box-shadow: 0 4px 15px rgba(${playerRgb}, 0.4);`}
         >
           {#if !$isPlaying}
-            <svg viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 ml-1"><path d="M8 5v14l11-7z"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 ml-0.5"><path d="M8 5v14l11-7z"/></svg>
           {:else}
             <svg viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
           {/if}
