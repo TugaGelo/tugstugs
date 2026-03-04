@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { getTrackMetadata } from '../lib/metadata';
   import { PUBLIC_BUCKET_URL } from 'astro:env/client';
-  import { currentSong, currentTitle, currentIndex, playlist } from '../lib/store';
+  import { currentSong, currentTitle, currentIndex, playlist, browsingCover, isPlaying } from '../lib/store';
 
   export let albumName;
   export let rawPaths = [];
@@ -11,7 +11,6 @@
   let coverUrl = null;
   let albumArtist = "";
   let isLoading = true;
-  
   let pageRgb = '30, 30, 36'; 
 
   onMount(async () => {
@@ -21,12 +20,9 @@
         const url = `${PUBLIC_BUCKET_URL}/${path}`;
         const data = await getTrackMetadata(url);
         return {
-          path,
-          title: data.title !== "Unknown Title" ? data.title : cleanFallbackTitle,
+          path, title: data.title !== "Unknown Title" ? data.title : cleanFallbackTitle,
           artist: data.artist !== "Unknown Artist" ? data.artist : "Unknown Artist",
-          trackNum: data.trackNum || 999,
-          discNum: data.discNum || 1,
-          cover: data.cover
+          trackNum: data.trackNum || 999, discNum: data.discNum || 1, cover: data.cover
         };
       } catch(e) {
         return { path, title: cleanFallbackTitle, artist: "Unknown Artist", trackNum: 999, discNum: 1, cover: null };
@@ -34,7 +30,6 @@
     });
 
     const results = await Promise.all(promises);
-
     results.sort((a, b) => {
       if (a.discNum !== b.discNum) return a.discNum - b.discNum; 
       return a.trackNum - b.trackNum;
@@ -49,12 +44,7 @@
       extractAlbumColor(coverUrl); 
     }
 
-    playlist.set(tracks.map(t => ({ 
-      path: t.path, 
-      title: t.title,
-      cover: t.cover || coverUrl 
-    })));
-    
+    browsingCover.set(coverUrl); 
     isLoading = false;
   });
 
@@ -71,21 +61,32 @@
       const brightness = (rawR * 299 + rawG * 587 + rawB * 114) / 1000;
       let r = rawR, g = rawG, b = rawB;
       if (brightness < 60) {
-        const boost = 60 - brightness;
+        const boost = 60 - brightness; 
         r = Math.min(255, Math.floor(rawR + boost));
         g = Math.min(255, Math.floor(rawG + boost));
         b = Math.min(255, Math.floor(rawB + boost));
       }
-      
       pageRgb = `${r}, ${g}, ${b}`;
     };
     img.src = imgSrc;
   }
 
-  function playTrack(index) {
+  function handleTrackClick(index, trackPath) {
+    if ($currentSong === trackPath) {
+      $isPlaying = !$isPlaying;
+      return;
+    }
+
+    playlist.set(tracks.map(t => ({ 
+      path: t.path, 
+      title: t.title,
+      cover: t.cover || coverUrl 
+    })));
+
     currentSong.set(tracks[index].path);
     currentTitle.set(tracks[index].title);
     currentIndex.set(index);
+    $isPlaying = true;
   }
 </script>
 
@@ -133,16 +134,27 @@
     <div class="w-full md:w-2/3 lg:w-3/4 flex flex-col pb-32">
       {#each tracks as track, index}
         <button 
-          on:click={() => playTrack(index)}
+          on:click={() => handleTrackClick(index, track.path)}
           class="group flex items-center w-full p-3 hover:bg-white/10 rounded-xl transition-colors text-left cursor-pointer border border-transparent hover:border-white/5"
         >
-          <div class="w-10 shrink-0 text-center text-gray-400 font-medium relative">
-            <span class="group-hover:hidden text-xs">{index + 1}</span>
-            <svg viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 hidden group-hover:block mx-auto text-white absolute inset-0 m-auto"><path d="M8 5v14l11-7z"/></svg>
+          <div class="w-10 flex-shrink-0 text-center text-gray-400 font-medium relative h-6">
+            <span class={`group-hover:hidden text-xs absolute inset-0 flex items-center justify-center ${track.path === $currentSong ? 'text-[#EA5455] font-black' : ''}`}>
+              {index + 1}
+            </span>
+            
+            <div class="hidden group-hover:flex absolute inset-0 items-center justify-center text-white">
+              {#if track.path === $currentSong && $isPlaying}
+                <svg viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+              {:else}
+                <svg viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 ml-0.5"><path d="M8 5v14l11-7z"/></svg>
+              {/if}
+            </div>
           </div>
 
-          <div class="flex-1 overflow-hidden pr-4">
-            <div class="font-bold text-gray-100 truncate group-hover:text-white transition-colors">{track.title}</div>
+          <div class="flex-1 overflow-hidden pr-4 ml-2">
+            <div class={`font-bold truncate group-hover:text-white transition-colors ${track.path === $currentSong ? 'text-[#EA5455]' : 'text-gray-100'}`}>
+              {track.title}
+            </div>
             <div class="text-sm text-gray-400 truncate mt-0.5">{track.artist}</div>
           </div>
         </button>

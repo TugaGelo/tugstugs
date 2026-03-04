@@ -2,44 +2,97 @@
   import { onMount } from 'svelte';
   import { getTrackMetadata } from '../lib/metadata';
   import { PUBLIC_BUCKET_URL } from 'astro:env/client';
+  import { currentSong, currentTitle, currentIndex, playlist, isPlaying } from '../lib/store';
 
   export let albumName;
   export let firstSongPath;
+  export let rawPaths = []; 
 
   let coverUrl = null;
-  let artistName = "Loading...";
+  let artist = "Loading...";
+  let isLoadingPlay = false;
+
+  $: isActiveAlbum = rawPaths.includes($currentSong);
 
   onMount(async () => {
     try {
       const url = `${PUBLIC_BUCKET_URL}/${firstSongPath}`;
       const data = await getTrackMetadata(url);
-      
       if (data.cover) coverUrl = data.cover;
-      if (data.artist !== "Unknown Artist") artistName = data.artist;
-    } catch(e) {
-      artistName = "Unknown Artist";
+      artist = data.artist !== "Unknown Artist" ? data.artist : "Unknown Artist";
+    } catch (e) {
+      artist = "Unknown Artist";
     }
   });
+
+  async function handleQuickPlay() {
+    if (isActiveAlbum) {
+      $isPlaying = !$isPlaying;
+      return;
+    }
+
+    if (isLoadingPlay || rawPaths.length === 0) return;
+    isLoadingPlay = true;
+
+    const promises = rawPaths.map(async (path) => {
+      const cleanFallbackTitle = path.split('/').pop().replace(/\.(mp3|m4a)$/i, "");
+      try {
+        const url = `${PUBLIC_BUCKET_URL}/${path}`;
+        const data = await getTrackMetadata(url);
+        return {
+          path, title: data.title !== "Unknown Title" ? data.title : cleanFallbackTitle,
+          artist: data.artist !== "Unknown Artist" ? data.artist : "Unknown Artist",
+          trackNum: data.trackNum || 999, discNum: data.discNum || 1, cover: data.cover
+        };
+      } catch(err) {
+        return { path, title: cleanFallbackTitle, artist: "Unknown Artist", trackNum: 999, discNum: 1, cover: null };
+      }
+    });
+
+    const results = await Promise.all(promises);
+    results.sort((a, b) => {
+      if (a.discNum !== b.discNum) return a.discNum - b.discNum;
+      return a.trackNum - b.trackNum;
+    });
+
+    const finalPlaylist = results.map(t => ({
+      path: t.path, title: t.title, cover: t.cover || coverUrl 
+    }));
+
+    playlist.set(finalPlaylist);
+    currentSong.set(finalPlaylist[0].path);
+    currentTitle.set(finalPlaylist[0].title);
+    currentIndex.set(0);
+    $isPlaying = true;
+
+    isLoadingPlay = false;
+  }
 </script>
 
-<a href={`/album/${encodeURIComponent(albumName)}`} class="group flex flex-col gap-3 cursor-pointer p-3 -mx-3 rounded-xl hover:bg-white/5 transition-colors">
+<a href={`/album/${albumName}`} class="group relative flex flex-col cursor-pointer transition-transform hover:-translate-y-1">
   
-  <div class="aspect-square w-full bg-black/40 rounded-lg overflow-hidden shadow-lg relative border border-white/5">
-     {#if coverUrl}
-       <img src={coverUrl} alt={albumName} class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-     {:else}
-       <div class="w-full h-full flex items-center justify-center text-retro-gold/20 font-black text-4xl">?</div>
-     {/if}
-     
-     <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity duration-300">
-        <div class="w-12 h-12 bg-retro-gold text-retro-slate rounded-full flex items-center justify-center shadow-xl transform scale-90 group-hover:scale-100 transition-transform">
-           <svg viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 ml-1"><path d="M8 5v14l11-7z"/></svg>
-        </div>
-     </div>
+  <div class="w-full aspect-square rounded-xl bg-white/5 shadow-lg overflow-hidden relative mb-3 border border-white/5 group-hover:shadow-2xl transition-all">
+    {#if coverUrl}
+      <img src={coverUrl} alt="Cover" class="w-full h-full object-cover" />
+    {:else}
+      <div class="w-full h-full flex items-center justify-center text-white/20 font-black text-4xl">?</div>
+    {/if}
+
+    <button 
+      on:click|preventDefault|stopPropagation={handleQuickPlay}
+      class="absolute bottom-3 right-3 w-12 h-12 flex items-center justify-center rounded-full bg-[#EA5455] text-white shadow-xl translate-y-2 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 hover:scale-105 transition-all duration-300 z-20"
+      disabled={isLoadingPlay && !isActiveAlbum}
+    >
+      {#if isLoadingPlay && !isActiveAlbum}
+        <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+      {:else if isActiveAlbum && $isPlaying}
+        <svg viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+      {:else}
+        <svg viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 ml-0.5"><path d="M8 5v14l11-7z"/></svg>
+      {/if}
+    </button>
   </div>
 
-  <div>
-     <h3 class="font-bold text-gray-50 truncate text-lg group-hover:text-retro-gold transition-colors">{albumName}</h3>
-     <p class="text-gray-400 text-sm truncate">{artistName}</p>
-  </div>
+  <h3 class="font-bold text-gray-100 truncate text-base mb-0.5 group-hover:text-white transition-colors">{albumName}</h3>
+  <p class="text-sm text-gray-400 truncate font-medium">{artist}</p>
 </a>

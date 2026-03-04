@@ -19,7 +19,8 @@ rawSongs.forEach(song => {
 
 const albums = Object.keys(albumsObj).map(name => ({
   name,
-  firstSongPath: albumsObj[name][0].path
+  firstSongPath: albumsObj[name][0].path,
+  allPaths: albumsObj[name].map(song => song.path) 
 }));
 ---
 
@@ -31,7 +32,12 @@ const albums = Object.keys(albumsObj).map(name => ({
 
     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-6 gap-y-10">
       {albums.map((album) => (
-        <AlbumCard client:load albumName={album.name} firstSongPath={album.firstSongPath} />
+        <AlbumCard 
+          client:load 
+          albumName={album.name} 
+          firstSongPath={album.firstSongPath} 
+          rawPaths={album.allPaths} 
+        />
       ))}
     </div>
   </main>

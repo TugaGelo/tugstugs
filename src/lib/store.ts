@@ -1,7 +1,9 @@
 import { writable } from 'svelte/store';
 
-export const currentSong = writable<string | null>(null);
-export const currentTitle = writable<string>("No song selected");
+export const currentSong = writable(null);
+export const currentTitle = writable("");
+export const currentIndex = writable(0);
+export const playlist = writable([]); 
+export const browsingCover = writable(null);
 
-export const playlist = writable<{title: string, path: string}[]>([]);
-export const currentIndex = writable<number>(0);
+export const isPlaying = writable(false);

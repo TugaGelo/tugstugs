@@ -1,5 +1,5 @@
 <script>
-  import { currentSong, currentTitle, playlist, currentIndex } from '../lib/store.ts';
+  import { currentSong, currentTitle, playlist, currentIndex, browsingCover, isPlaying } from '../lib/store.ts';
   import { PUBLIC_BUCKET_URL } from 'astro:env/client';
 
   let audioA;
@@ -17,7 +17,6 @@
   let isTransitioning = false;
 
   let playerRgb = '30, 30, 36'; 
-  
   let playingCover = null; 
 
   $: if ($currentSong && $currentSong !== playingPath) {
@@ -26,7 +25,7 @@
     playExplicitTrack($currentIndex);
   }
 
-  $: themeCover = $playlist[0]?.cover || playingCover;
+  $: themeCover = $browsingCover || playingCover;
 
   $: if (themeCover) {
     const img = new Image();
@@ -46,10 +45,19 @@
         g = Math.min(255, Math.floor(rawG + boost));
         b = Math.min(255, Math.floor(rawB + boost));
       }
-      
       playerRgb = `${r}, ${g}, ${b}`;
     };
     img.src = themeCover;
+  }
+
+  $: {
+    if ($isPlaying && paused) {
+      const activeAudio = activeDeck === 'A' ? audioA : audioB;
+      if (activeAudio) activeAudio.play().catch(e => console.error(e));
+    } else if (!$isPlaying && !paused) {
+      const activeAudio = activeDeck === 'A' ? audioA : audioB;
+      if (activeAudio) activeAudio.pause();
+    }
   }
 
   function playExplicitTrack(index) {
@@ -66,6 +74,7 @@
             audioA.src = url;
             audioA.play().catch(e => console.error(e));
             paused = false;
+            $isPlaying = true;
         }
         preloadNext(index, 'A');
     }, 0);
@@ -119,10 +128,7 @@
   }
 
   function togglePause() {
-    const activeAudio = activeDeck === 'A' ? audioA : audioB;
-    if (!activeAudio) return;
-    if (paused) activeAudio.play();
-    else activeAudio.pause();
+    $isPlaying = !$isPlaying;
   }
 
   function playNext() {
@@ -164,8 +170,8 @@
   style={`background: linear-gradient(180deg, rgba(${playerRgb}, 0.15) 0%, rgba(20, 20, 24, 0.95) 100%); box-shadow: 0 -20px 60px rgba(${playerRgb}, 0.15); border-top-color: rgba(${playerRgb}, 0.6);`}
 >
   
-  <audio bind:this={audioA} preload="auto" on:timeupdate={handleTimeUpdate} on:play={() => paused = false} on:pause={() => paused = true} class="hidden"></audio>
-  <audio bind:this={audioB} preload="auto" on:timeupdate={handleTimeUpdate} on:play={() => paused = false} on:pause={() => paused = true} class="hidden"></audio>
+  <audio bind:this={audioA} preload="auto" on:timeupdate={handleTimeUpdate} on:play={() => { paused = false; $isPlaying = true; }} on:pause={() => { paused = true; $isPlaying = false; }} class="hidden"></audio>
+  <audio bind:this={audioB} preload="auto" on:timeupdate={handleTimeUpdate} on:play={() => { paused = false; $isPlaying = true; }} on:pause={() => { paused = true; $isPlaying = false; }} class="hidden"></audio>
 
   {#if $currentSong}
     <div class="flex flex-col md:flex-row items-center w-full max-w-6xl gap-4 md:gap-8">
@@ -190,7 +196,7 @@
           class="w-12 h-12 flex items-center justify-center rounded-full text-black hover:scale-105 transition-transform shadow-md cursor-pointer"
           style={`background-color: rgb(${playerRgb}); box-shadow: 0 4px 15px rgba(${playerRgb}, 0.4);`}
         >
-          {#if paused}
+          {#if !$isPlaying}
             <svg viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 ml-1"><path d="M8 5v14l11-7z"/></svg>
           {:else}
             <svg viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
