@@ -2,54 +2,143 @@
   import { currentSong, currentTitle, playlist, currentIndex } from '../lib/store.ts';
   import { PUBLIC_BUCKET_URL } from 'astro:env/client';
 
-  $: fullUrl = $currentSong ? `${PUBLIC_BUCKET_URL}/${$currentSong}` : null;
-
-  let paused = true;
+  let audioA;
+  let audioB;
+  
+  let activeDeck = 'A'; 
+  let playingPath = null; 
+  
   let time = 0;
   let duration = 0;
+  let paused = true;
   let volume = 1; 
   let isMuted = false;
+  let isDragging = false;
+  let isTransitioning = false;
 
-  function formatTime(sec) {
-    if (isNaN(sec)) return "0:00";
-    const minutes = Math.floor(sec / 60);
-    const seconds = Math.floor(sec % 60).toString().padStart(2, '0');
-    return `${minutes}:${seconds}`;
+  $: if ($currentSong && $currentSong !== playingPath) {
+    playingPath = $currentSong; 
+    playExplicitTrack($currentIndex);
+  }
+
+  function playExplicitTrack(index) {
+    if (index === undefined || index === null || !$playlist[index]) return;
+    
+    const url = `${PUBLIC_BUCKET_URL}/${$playlist[index].path}`;
+    
+    if (audioA) { audioA.pause(); audioA.currentTime = 0; }
+    if (audioB) { audioB.pause(); audioB.currentTime = 0; }
+    
+    activeDeck = 'A'; 
+    
+    setTimeout(() => {
+        if (audioA) {
+            audioA.src = url;
+            audioA.play().catch(e => console.error(e));
+            paused = false;
+        }
+        preloadNext(index, 'A');
+    }, 0);
+  }
+
+  function preloadNext(currentIdx, active) {
+    const nextIdx = currentIdx + 1;
+    if (nextIdx < $playlist.length) {
+      const nextUrl = `${PUBLIC_BUCKET_URL}/${$playlist[nextIdx].path}`;
+      if (active === 'A' && audioB) {
+        audioB.src = nextUrl;
+        audioB.load(); 
+      } else if (active === 'B' && audioA) {
+        audioA.src = nextUrl;
+        audioA.load();
+      }
+    }
+  }
+
+  function handleTimeUpdate(e) {
+    const targetDeck = e.target === audioA ? 'A' : 'B';
+    
+    if (targetDeck === activeDeck) {
+      if (!isDragging) time = e.target.currentTime;
+      duration = e.target.duration;
+      
+      if (duration > 0 && (duration - time) <= 0.25 && !isTransitioning) {
+        doGaplessTransition();
+      }
+    }
+  }
+
+  function doGaplessTransition() {
+    if ($currentIndex >= $playlist.length - 1) return; 
+    
+    isTransitioning = true;
+    const nextIdx = $currentIndex + 1;
+    playingPath = $playlist[nextIdx].path;
+    
+    if (activeDeck === 'A') {
+      activeDeck = 'B';
+      if (audioB) audioB.play().catch(e => console.error(e));
+    } else {
+      activeDeck = 'A';
+      if (audioA) audioA.play().catch(e => console.error(e));
+    }
+    
+    currentIndex.set(nextIdx);
+    currentSong.set(playingPath);
+    currentTitle.set($playlist[nextIdx].title);
+    
+    preloadNext(nextIdx, activeDeck);
+    
+    setTimeout(() => { isTransitioning = false; }, 1000); 
+  }
+
+  function togglePause() {
+    const activeAudio = activeDeck === 'A' ? audioA : audioB;
+    if (!activeAudio) return;
+    if (paused) activeAudio.play();
+    else activeAudio.pause();
   }
 
   function playNext() {
     if ($currentIndex < $playlist.length - 1) {
-      const nextIdx = $currentIndex + 1;
-      currentIndex.set(nextIdx);
-      currentSong.set($playlist[nextIdx].path);
-      currentTitle.set($playlist[nextIdx].title);
+      currentIndex.set($currentIndex + 1);
+      currentSong.set($playlist[$currentIndex + 1].path);
+      currentTitle.set($playlist[$currentIndex + 1].title);
     }
   }
 
   function playPrev() {
     if ($currentIndex > 0) {
-      const prevIdx = $currentIndex - 1;
-      currentIndex.set(prevIdx);
-      currentSong.set($playlist[prevIdx].path);
-      currentTitle.set($playlist[prevIdx].title);
+      currentIndex.set($currentIndex - 1);
+      currentSong.set($playlist[$currentIndex - 1].path);
+      currentTitle.set($playlist[$currentIndex - 1].title);
     }
+  }
+
+  function handleSeek() {
+    const activeAudio = activeDeck === 'A' ? audioA : audioB;
+    if (activeAudio) activeAudio.currentTime = time;
+  }
+
+  $: {
+    if (audioA) { audioA.volume = volume; audioA.muted = isMuted; }
+    if (audioB) { audioB.volume = volume; audioB.muted = isMuted; }
+  }
+
+  function formatTime(sec) {
+    if (isNaN(sec) || !isFinite(sec)) return "0:00";
+    const minutes = Math.floor(sec / 60);
+    const seconds = Math.floor(sec % 60).toString().padStart(2, '0');
+    return `${minutes}:${seconds}`;
   }
 </script>
 
 <div class="fixed bottom-0 left-0 w-full bg-retro-slate border-t-4 border-retro-orange p-4 md:p-6 flex flex-col items-center justify-between z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
   
-  {#if fullUrl}
-    <audio 
-      src={fullUrl} 
-      bind:paused={paused} 
-      bind:currentTime={time} 
-      bind:duration={duration} 
-      bind:volume={volume}
-      bind:muted={isMuted}
-      on:ended={playNext} 
-      autoplay
-    ></audio>
+  <audio bind:this={audioA} preload="auto" on:timeupdate={handleTimeUpdate} on:play={() => paused = false} on:pause={() => paused = true} class="hidden"></audio>
+  <audio bind:this={audioB} preload="auto" on:timeupdate={handleTimeUpdate} on:play={() => paused = false} on:pause={() => paused = true} class="hidden"></audio>
 
+  {#if $currentSong}
     <div class="flex flex-col md:flex-row items-center w-full max-w-6xl gap-4 md:gap-8">
       
       <div class="flex flex-col w-full md:w-48 text-center md:text-left shrink-0">
@@ -62,7 +151,7 @@
           <svg viewBox="0 0 24 24" fill="currentColor" class="w-8 h-8"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
         </button>
 
-        <button on:click={() => paused = !paused} class="w-12 h-12 flex items-center justify-center rounded-full bg-retro-gold text-retro-slate hover:bg-retro-orange hover:text-white hover:scale-105 transition-all shadow-md cursor-pointer">
+        <button on:click={togglePause} class="w-12 h-12 flex items-center justify-center rounded-full bg-retro-gold text-retro-slate hover:bg-retro-orange hover:text-white hover:scale-105 transition-all shadow-md cursor-pointer">
           {#if paused}
             <svg viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 ml-1"><path d="M8 5v14l11-7z"/></svg>
           {:else}
@@ -76,26 +165,28 @@
       </div>
 
       <div class="flex items-center gap-6 w-full text-xs font-mono text-gray-400">
-        
-        <div class="flex items-center gap-2 flex-1">
+        <div class="flex items-center gap-2 flex-1 relative">
           <span class="w-10 text-right">{formatTime(time)}</span>
-          <input type="range" min="0" max={duration || 0} bind:value={time} class="w-full h-2 rounded-lg appearance-none cursor-pointer bg-black/30 accent-retro-coral" />
+          <input 
+            type="range" min="0" max={duration || 0} step="0.1"
+            bind:value={time} 
+            on:mousedown={() => isDragging = true}
+            on:mouseup={() => { isDragging = false; handleSeek(); }}
+            on:touchstart={() => isDragging = true}
+            on:touchend={() => { isDragging = false; handleSeek(); }}
+            class="w-full h-2 rounded-lg appearance-none cursor-pointer bg-black/30 accent-retro-coral" 
+          />
           <span class="w-10 text-left">{formatTime(duration)}</span>
         </div>
 
         <div class="hidden md:flex items-center gap-2 w-32 group">
-          
-          <button 
-            on:click={() => isMuted = !isMuted} 
-            class="text-gray-400 hover:text-retro-gold transition-colors flex-shrink-0 cursor-pointer"
-          >
+          <button on:click={() => isMuted = !isMuted} class="text-gray-400 hover:text-retro-gold transition-colors flex-shrink-0 cursor-pointer">
             {#if isMuted || volume === 0}
               <svg viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
             {:else}
               <svg viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
             {/if}
           </button>
-
           <input 
             type="range" min="0" max="1" step="0.01" 
             bind:value={volume} 
@@ -103,9 +194,7 @@
             class="w-full h-1.5 rounded-lg appearance-none cursor-pointer bg-black/30 accent-retro-gold" 
           />
         </div>
-
       </div>
-
     </div>
   {:else}
     <div class="w-full max-w-6xl flex items-center justify-center border-2 border-dashed border-retro-coral/40 rounded-full bg-black/20 p-3">
