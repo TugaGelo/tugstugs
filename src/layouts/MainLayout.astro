@@ -1,4 +1,5 @@
 ---
+import { ClientRouter } from 'astro:transitions';
 import '../styles/global.css';
 import Player from '../components/Player.svelte';
 ---
@@ -8,10 +9,14 @@ import Player from '../components/Player.svelte';
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width" />
     <title>TugsTugs | Retro Hi-Fi</title>
+    
+    <ClientRouter />
   </head>
   <body class="bg-retro-slate text-gray-100 min-h-screen pb-32 font-sans antialiased selection:bg-retro-coral selection:text-white">
     <slot />
     
-    <Player client:load /> 
+    <div transition:persist="player">
+      <Player client:load /> 
+    </div>
   </body>
 </html>
