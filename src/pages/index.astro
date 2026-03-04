@@ -1,38 +1,38 @@
 ---
 import MainLayout from '../layouts/MainLayout.astro';
-import TrackRow from '../components/TrackRow.svelte';
+import AlbumCard from '../components/AlbumCard.svelte';
 import { getLibrary } from '../lib/r2.ts';
 
-const songs = await getLibrary();
+const rawSongs = await getLibrary();
+
+const albumsObj: Record<string, any[]> = {};
+
+rawSongs.forEach(song => {
+  const parts = song.path.split('/');
+  const albumName = parts.length > 1 ? parts[0] : 'Singles';
+  
+  if (!albumsObj[albumName]) {
+    albumsObj[albumName] = [];
+  }
+  albumsObj[albumName].push(song);
+});
+
+const albums = Object.keys(albumsObj).map(name => ({
+  name,
+  firstSongPath: albumsObj[name][0].path
+}));
 ---
 
 <MainLayout>
-  <main id="library-main" data-songs={JSON.stringify(songs)} class="max-w-3xl mx-auto p-8">
-    <h1 class="text-5xl md:text-6xl font-black mb-10 text-retro-gold tracking-tight drop-shadow-md">
-      TUGSTUGS.
+  <main class="max-w-7xl mx-auto p-6 md:p-10">
+    <h1 class="text-3xl md:text-5xl font-black mb-8 text-white tracking-tight">
+      Listen Again
     </h1>
 
-    <div class="flex flex-col gap-3">
-      {songs.map((song: { path: string }, index: number) => (
-        <TrackRow client:load path={song.path} index={index} />
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-6 gap-y-10">
+      {albums.map((album) => (
+        <AlbumCard client:load albumName={album.name} firstSongPath={album.firstSongPath} />
       ))}
     </div>
   </main>
 </MainLayout>
-
-<script>
-  import { playlist } from '../lib/store.ts';
-
-  const mainElement = document.getElementById('library-main');
-  
-  if (mainElement) {
-    const rawSongs = JSON.parse(mainElement.getAttribute('data-songs') || '[]');
-    
-    const formattedPlaylist = rawSongs.map((song: { path: string }) => ({
-      path: song.path,
-      title: song.path.split('/').pop()?.replace(/\.(mp3|m4a)$/i, "") || "Unknown"
-    }));
-
-    playlist.set(formattedPlaylist);
-  }
-</script>

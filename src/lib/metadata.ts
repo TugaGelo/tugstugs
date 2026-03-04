@@ -5,7 +5,7 @@ export async function getTrackMetadata(url: string): Promise<any> {
   return new Promise((resolve, reject) => {
     new jsmediatags.Reader(url).read({
       onSuccess: (tag: any) => {
-        const { title, artist, album, picture } = tag.tags;
+        const { title, artist, album, picture, track } = tag.tags;
         
         let imageUrl = null;
         if (picture) {
@@ -17,11 +17,18 @@ export async function getTrackMetadata(url: string): Promise<any> {
           imageUrl = `data:${format};base64,${window.btoa(base64String)}`;
         }
 
+        let trackNum = 999; 
+        if (track) {
+          const parsed = parseInt(track.toString().split('/')[0]);
+          if (!isNaN(parsed)) trackNum = parsed;
+        }
+
         resolve({
           title: title || "Unknown Title",
           artist: artist || "Unknown Artist",
           album: album || "Unknown Album",
-          cover: imageUrl
+          cover: imageUrl,
+          trackNum: trackNum
         });
       },
       onError: (error: any) => {
