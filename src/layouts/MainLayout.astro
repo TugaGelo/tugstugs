@@ -1,15 +1,16 @@
 ---
+import '../styles/global.css';
 import Player from '../components/Player.svelte';
 ---
 
-<html lang="en" class="bg-black text-white">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width" />
-    <title>TugsTugs</title>
+    <title>TugsTugs | Retro Hi-Fi</title>
   </head>
-  <body class="pb-32"> <main class="max-w-4xl mx-auto p-8">
-      <slot /> </main>
+  <body class="bg-retro-slate text-gray-100 min-h-screen pb-32 font-sans antialiased selection:bg-retro-coral selection:text-white">
+    <slot />
     
     <Player client:load /> 
   </body>

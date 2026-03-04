@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+@theme {
+  --color-retro-slate: #2D4059;
+  --color-retro-coral: #EA5455;
+  --color-retro-orange: #F07B3F;
+  --color-retro-gold: #FFD460;
+}

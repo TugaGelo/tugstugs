@@ -12,9 +12,11 @@
     "@astrojs/cloudflare": "^12.6.12",
     "@astrojs/svelte": "^7.2.5",
     "@aws-sdk/client-s3": "^3.1000.0",
+    "@tailwindcss/vite": "^4.2.1",
     "astro": "^5.17.1",
     "jsmediatags": "^3.9.7",
     "svelte": "^5.53.6",
+    "tailwindcss": "^4.2.1",
     "typescript": "^5.9.3"
   }
 }

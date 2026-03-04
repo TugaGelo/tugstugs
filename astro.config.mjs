@@ -4,6 +4,8 @@ import { defineConfig, envField } from 'astro/config';
 import svelte from '@astrojs/svelte';
 import cloudflare from '@astrojs/cloudflare';
 
+import tailwindcss from '@tailwindcss/vite';
+
 // https://astro.build/config
 export default defineConfig({
   integrations: [svelte()],
@@ -18,5 +20,9 @@ export default defineConfig({
       R2_ACCOUNT_ID: envField.string({ context: 'server', access: 'secret' }),
       R2_BUCKET_NAME: envField.string({ context: 'server', access: 'secret' }),
     }
+  },
+
+  vite: {
+    plugins: [tailwindcss()]
   }
 });
