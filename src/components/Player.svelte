@@ -16,14 +16,44 @@
   let isDragging = false;
   let isTransitioning = false;
 
+  let playerRgb = '30, 30, 36'; 
+  
+  let playingCover = null; 
+
   $: if ($currentSong && $currentSong !== playingPath) {
     playingPath = $currentSong; 
+    playingCover = $playlist[$currentIndex]?.cover || playingCover;
     playExplicitTrack($currentIndex);
+  }
+
+  $: themeCover = $playlist[0]?.cover || playingCover;
+
+  $: if (themeCover) {
+    const img = new Image();
+    img.crossOrigin = "Anonymous";
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = 1; canvas.height = 1;
+      ctx.drawImage(img, 0, 0, 1, 1);
+      const [rawR, rawG, rawB] = ctx.getImageData(0, 0, 1, 1).data;
+      
+      const brightness = (rawR * 299 + rawG * 587 + rawB * 114) / 1000;
+      let r = rawR, g = rawG, b = rawB;
+      if (brightness < 100) {
+        const boost = 100 - brightness; 
+        r = Math.min(255, Math.floor(rawR + boost));
+        g = Math.min(255, Math.floor(rawG + boost));
+        b = Math.min(255, Math.floor(rawB + boost));
+      }
+      
+      playerRgb = `${r}, ${g}, ${b}`;
+    };
+    img.src = themeCover;
   }
 
   function playExplicitTrack(index) {
     if (index === undefined || index === null || !$playlist[index]) return;
-    
     const url = `${PUBLIC_BUCKET_URL}/${$playlist[index].path}`;
     
     if (audioA) { audioA.pause(); audioA.currentTime = 0; }
@@ -57,11 +87,9 @@
 
   function handleTimeUpdate(e) {
     const targetDeck = e.target === audioA ? 'A' : 'B';
-    
     if (targetDeck === activeDeck) {
       if (!isDragging) time = e.target.currentTime;
       duration = e.target.duration;
-      
       if (duration > 0 && (duration - time) <= 0.25 && !isTransitioning) {
         doGaplessTransition();
       }
@@ -70,7 +98,6 @@
 
   function doGaplessTransition() {
     if ($currentIndex >= $playlist.length - 1) return; 
-    
     isTransitioning = true;
     const nextIdx = $currentIndex + 1;
     playingPath = $playlist[nextIdx].path;
@@ -88,7 +115,6 @@
     currentTitle.set($playlist[nextIdx].title);
     
     preloadNext(nextIdx, activeDeck);
-    
     setTimeout(() => { isTransitioning = false; }, 1000); 
   }
 
@@ -133,7 +159,10 @@
   }
 </script>
 
-<div class="fixed bottom-0 left-0 w-full bg-retro-slate border-t-4 border-retro-orange p-4 md:p-6 flex flex-col items-center justify-between z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+<div 
+  class="fixed bottom-0 left-0 w-full p-4 md:p-6 flex flex-col items-center justify-between z-50 transition-all duration-1000 border-t border-white/10 backdrop-blur-2xl"
+  style={`background: linear-gradient(180deg, rgba(${playerRgb}, 0.15) 0%, rgba(20, 20, 24, 0.95) 100%); box-shadow: 0 -20px 60px rgba(${playerRgb}, 0.15); border-top-color: rgba(${playerRgb}, 0.6);`}
+>
   
   <audio bind:this={audioA} preload="auto" on:timeupdate={handleTimeUpdate} on:play={() => paused = false} on:pause={() => paused = true} class="hidden"></audio>
   <audio bind:this={audioB} preload="auto" on:timeupdate={handleTimeUpdate} on:play={() => paused = false} on:pause={() => paused = true} class="hidden"></audio>
@@ -141,17 +170,26 @@
   {#if $currentSong}
     <div class="flex flex-col md:flex-row items-center w-full max-w-6xl gap-4 md:gap-8">
       
-      <div class="flex flex-col w-full md:w-48 text-center md:text-left shrink-0">
-        <span class="text-[10px] text-retro-gold uppercase font-black tracking-widest mb-1">Now Spinning</span>
-        <span class="text-gray-100 font-bold truncate text-base">{$currentTitle}</span>
+      <div class="flex items-center justify-center md:justify-start w-full md:w-64 shrink-0 gap-3">
+        {#if playingCover}
+          <img src={playingCover} alt="Cover" class="w-12 h-12 rounded bg-black/40 object-cover shadow-lg border border-white/10" />
+        {/if}
+        <div class="flex flex-col text-center md:text-left overflow-hidden">
+          <span class="text-[9px] text-gray-400 uppercase font-black tracking-widest mb-0.5" style={`color: rgba(${playerRgb}, 1)`}>Now Spinning</span>
+          <span class="text-gray-100 font-bold truncate text-sm md:text-base">{$currentTitle}</span>
+        </div>
       </div>
 
       <div class="flex items-center gap-3 shrink-0">
-        <button on:click={playPrev} class="text-gray-400 hover:text-white transition-colors disabled:opacity-30 cursor-pointer" disabled={$currentIndex === 0}>
+        <button on:click={playPrev} class="text-gray-300 hover:text-white transition-colors disabled:opacity-30 cursor-pointer" disabled={$currentIndex === 0}>
           <svg viewBox="0 0 24 24" fill="currentColor" class="w-8 h-8"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
         </button>
 
-        <button on:click={togglePause} class="w-12 h-12 flex items-center justify-center rounded-full bg-retro-gold text-retro-slate hover:bg-retro-orange hover:text-white hover:scale-105 transition-all shadow-md cursor-pointer">
+        <button 
+          on:click={togglePause} 
+          class="w-12 h-12 flex items-center justify-center rounded-full text-black hover:scale-105 transition-transform shadow-md cursor-pointer"
+          style={`background-color: rgb(${playerRgb}); box-shadow: 0 4px 15px rgba(${playerRgb}, 0.4);`}
+        >
           {#if paused}
             <svg viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 ml-1"><path d="M8 5v14l11-7z"/></svg>
           {:else}
@@ -159,12 +197,12 @@
           {/if}
         </button>
 
-        <button on:click={playNext} class="text-gray-400 hover:text-white transition-colors disabled:opacity-30 cursor-pointer" disabled={$currentIndex === $playlist.length - 1}>
+        <button on:click={playNext} class="text-gray-300 hover:text-white transition-colors disabled:opacity-30 cursor-pointer" disabled={$currentIndex === $playlist.length - 1}>
           <svg viewBox="0 0 24 24" fill="currentColor" class="w-8 h-8"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
         </button>
       </div>
 
-      <div class="flex items-center gap-6 w-full text-xs font-mono text-gray-400">
+      <div class="flex items-center gap-6 w-full text-xs font-mono text-gray-300">
         <div class="flex items-center gap-2 flex-1 relative">
           <span class="w-10 text-right">{formatTime(time)}</span>
           <input 
@@ -174,13 +212,14 @@
             on:mouseup={() => { isDragging = false; handleSeek(); }}
             on:touchstart={() => isDragging = true}
             on:touchend={() => { isDragging = false; handleSeek(); }}
-            class="w-full h-2 rounded-lg appearance-none cursor-pointer bg-black/30 accent-retro-coral" 
+            class="w-full h-2 rounded-lg appearance-none cursor-pointer bg-white/10" 
+            style={`accent-color: rgb(${playerRgb});`}
           />
           <span class="w-10 text-left">{formatTime(duration)}</span>
         </div>
 
         <div class="hidden md:flex items-center gap-2 w-32 group">
-          <button on:click={() => isMuted = !isMuted} class="text-gray-400 hover:text-retro-gold transition-colors flex-shrink-0 cursor-pointer">
+          <button on:click={() => isMuted = !isMuted} class="text-gray-300 hover:text-white transition-colors flex-shrink-0 cursor-pointer">
             {#if isMuted || volume === 0}
               <svg viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
             {:else}
@@ -191,14 +230,15 @@
             type="range" min="0" max="1" step="0.01" 
             bind:value={volume} 
             on:input={() => { if(isMuted && volume > 0) isMuted = false; }}
-            class="w-full h-1.5 rounded-lg appearance-none cursor-pointer bg-black/30 accent-retro-gold" 
+            class="w-full h-1.5 rounded-lg appearance-none cursor-pointer bg-white/10"
+            style={`accent-color: rgb(${playerRgb});`} 
           />
         </div>
       </div>
     </div>
   {:else}
-    <div class="w-full max-w-6xl flex items-center justify-center border-2 border-dashed border-retro-coral/40 rounded-full bg-black/20 p-3">
-      <span class="text-retro-coral/80 text-sm italic font-medium">Drop a coin to play...</span>
+    <div class="w-full max-w-6xl flex items-center justify-center border-2 border-dashed border-white/10 rounded-full bg-black/20 p-3">
+      <span class="text-gray-400 text-sm italic font-medium">Drop a coin to play...</span>
     </div>
   {/if}
 </div>
