@@ -45,11 +45,18 @@ const songs = await getLibrary();
 </MainLayout>
 
 <script>
-  import { currentSong, currentTitle } from '../lib/store.ts';
+  import { currentSong, currentTitle, playlist, currentIndex } from '../lib/store.ts';
 
-  const buttons = document.querySelectorAll('.play-btn');
+  const buttons = Array.from(document.querySelectorAll('.play-btn'));
 
-  buttons.forEach(button => {
+  const songsArray = buttons.map(btn => ({
+    path: btn.getAttribute('data-path') || '',
+    title: btn.getAttribute('data-title') || ''
+  }));
+  
+  playlist.set(songsArray);
+
+  buttons.forEach((button, index) => {
     button.addEventListener('click', () => {
       const path = button.getAttribute('data-path');
       const title = button.getAttribute('data-title');
@@ -57,6 +64,7 @@ const songs = await getLibrary();
       if (path && title) {
         currentSong.set(path);
         currentTitle.set(title);
+        currentIndex.set(index);
       }
     });
   });
