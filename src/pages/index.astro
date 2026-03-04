@@ -7,13 +7,13 @@ const songs = await getLibrary();
 ---
 
 <MainLayout>
-  <main class="max-w-3xl mx-auto p-8">
+  <main id="library-main" data-songs={JSON.stringify(songs)} class="max-w-3xl mx-auto p-8">
     <h1 class="text-5xl md:text-6xl font-black mb-10 text-retro-gold tracking-tight drop-shadow-md">
       TUGSTUGS.
     </h1>
 
     <div class="flex flex-col gap-3">
-      {songs.map((song, index) => (
+      {songs.map((song: { path: string }, index: number) => (
         <TrackRow client:load path={song.path} index={index} />
       ))}
     </div>
@@ -21,27 +21,18 @@ const songs = await getLibrary();
 </MainLayout>
 
 <script>
-  import { currentSong, currentTitle, playlist, currentIndex } from '../lib/store.ts';
+  import { playlist } from '../lib/store.ts';
 
-  const buttons = Array.from(document.querySelectorAll('.play-btn'));
-
-  const songsArray = buttons.map(btn => ({
-    path: btn.getAttribute('data-path') || '',
-    title: btn.getAttribute('data-title') || ''
-  }));
+  const mainElement = document.getElementById('library-main');
   
-  playlist.set(songsArray);
+  if (mainElement) {
+    const rawSongs = JSON.parse(mainElement.getAttribute('data-songs') || '[]');
+    
+    const formattedPlaylist = rawSongs.map((song: { path: string }) => ({
+      path: song.path,
+      title: song.path.split('/').pop()?.replace(/\.(mp3|m4a)$/i, "") || "Unknown"
+    }));
 
-  buttons.forEach((button, index) => {
-    button.addEventListener('click', () => {
-      const path = button.getAttribute('data-path');
-      const title = button.getAttribute('data-title');
-      
-      if (path && title) {
-        currentSong.set(path);
-        currentTitle.set(title);
-        currentIndex.set(index);
-      }
-    });
-  });
+    playlist.set(formattedPlaylist);
+  }
 </script>
