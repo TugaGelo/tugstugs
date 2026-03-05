@@ -1,18 +1,22 @@
 import { S3Client, ListObjectsV2Command } from "@aws-sdk/client-s3";
-import { R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ACCOUNT_ID, R2_BUCKET_NAME } from 'astro:env/server';
-
-const s3 = new S3Client({
-  region: "auto",
-  endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  credentials: {
-    accessKeyId: R2_ACCESS_KEY_ID, 
-    secretAccessKey: R2_SECRET_ACCESS_KEY,
-  },
-});
 
 export async function getLibrary(): Promise<{ title: string; path: string }[]> {
+  const accountId = import.meta.env.R2_ACCOUNT_ID as string;
+  const accessKey = import.meta.env.R2_ACCESS_KEY_ID as string;
+  const secretKey = import.meta.env.R2_SECRET_ACCESS_KEY as string;
+  const bucketName = import.meta.env.R2_BUCKET_NAME as string;
+
+  const s3 = new S3Client({
+    region: "auto",
+    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId: accessKey, 
+      secretAccessKey: secretKey,
+    },
+  });
+
   const command = new ListObjectsV2Command({
-    Bucket: R2_BUCKET_NAME,
+    Bucket: bucketName,
   });
 
   try {
