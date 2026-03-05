@@ -4,7 +4,17 @@ import AlbumView from '../../components/AlbumView.svelte';
 import { getLibrary } from '../../lib/r2.ts';
 
 const { album } = Astro.params;
-const allSongs = await getLibrary();
+
+const cfEnv = (Astro.locals as any).runtime?.env || {};
+
+const credentials = {
+  accountId: cfEnv.R2_ACCOUNT_ID || import.meta.env.R2_ACCOUNT_ID,
+  accessKey: cfEnv.R2_ACCESS_KEY_ID || import.meta.env.R2_ACCESS_KEY_ID,
+  secretKey: cfEnv.R2_SECRET_ACCESS_KEY || import.meta.env.R2_SECRET_ACCESS_KEY,
+  bucketName: cfEnv.R2_BUCKET_NAME || import.meta.env.R2_BUCKET_NAME,
+};
+
+const allSongs = await getLibrary(credentials);
 
 const albumSongs = allSongs.filter(song => {
   const parts = song.path.split('/');

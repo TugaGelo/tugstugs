@@ -1,11 +1,15 @@
 import { S3Client, ListObjectsV2Command } from "@aws-sdk/client-s3";
-import { getSecret } from "astro:env/server";
 
-export async function getLibrary(): Promise<{ title: string; path: string }[]> {
-  const accountId = getSecret("R2_ACCOUNT_ID") as string;
-  const accessKey = getSecret("R2_ACCESS_KEY_ID") as string;
-  const secretKey = getSecret("R2_SECRET_ACCESS_KEY") as string;
-  const bucketName = getSecret("R2_BUCKET_NAME") as string;
+export async function getLibrary(credentials?: any): Promise<{ title: string; path: string }[]> {
+  const accountId = credentials?.accountId || import.meta.env.R2_ACCOUNT_ID;
+  const accessKey = credentials?.accessKey || import.meta.env.R2_ACCESS_KEY_ID;
+  const secretKey = credentials?.secretKey || import.meta.env.R2_SECRET_ACCESS_KEY;
+  const bucketName = credentials?.bucketName || import.meta.env.R2_BUCKET_NAME;
+
+  if (!accountId || !accessKey) {
+     console.error("Missing R2 credentials! Check local .env or Cloudflare settings.");
+     return [];
+  }
 
   const s3 = new S3Client({
     region: "auto",
