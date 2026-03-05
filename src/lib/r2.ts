@@ -1,10 +1,11 @@
 import { S3Client, ListObjectsV2Command } from "@aws-sdk/client-s3";
+import { getSecret } from "astro:env/server";
 
 export async function getLibrary(): Promise<{ title: string; path: string }[]> {
-  const accountId = import.meta.env.R2_ACCOUNT_ID as string;
-  const accessKey = import.meta.env.R2_ACCESS_KEY_ID as string;
-  const secretKey = import.meta.env.R2_SECRET_ACCESS_KEY as string;
-  const bucketName = import.meta.env.R2_BUCKET_NAME as string;
+  const accountId = getSecret("R2_ACCOUNT_ID") as string;
+  const accessKey = getSecret("R2_ACCESS_KEY_ID") as string;
+  const secretKey = getSecret("R2_SECRET_ACCESS_KEY") as string;
+  const bucketName = getSecret("R2_BUCKET_NAME") as string;
 
   const s3 = new S3Client({
     region: "auto",
