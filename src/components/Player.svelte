@@ -15,6 +15,7 @@
   let isMuted = false;
   let isDragging = false;
   let isTransitioning = false;
+  let hasPreloadedNext = false;
 
   let playerRgb = '234, 84, 85'; 
   let playingCover = null; 
@@ -79,7 +80,11 @@
     const url = `${PUBLIC_BUCKET_URL}/${$playlist[index].path}`;
     if (audioA) { audioA.pause(); audioA.currentTime = 0; }
     if (audioB) { audioB.pause(); audioB.currentTime = 0; }
+    
     activeDeck = 'A'; 
+    hasPreloadedNext = false;
+    isTransitioning = false;
+
     setTimeout(() => {
         if (audioA) {
             audioA.src = url;
@@ -87,8 +92,31 @@
             paused = false;
             $isPlaying = true; 
         }
-        preloadNext(index, 'A');
     }, 0);
+  }
+
+  function handleTimeUpdate(e) {
+    const targetDeck = e.target === audioA ? 'A' : 'B';
+    if (targetDeck === activeDeck) {
+      if (!isDragging) time = e.target.currentTime;
+      duration = e.target.duration;
+
+      if (duration > 0 && (duration - time) <= 15 && !hasPreloadedNext) {
+        preloadNext($currentIndex, activeDeck);
+        hasPreloadedNext = true;
+      }
+
+      if (duration > 0 && (duration - time) <= 0.4 && !isTransitioning) {
+        doGaplessTransition();
+      }
+    }
+  }
+
+  function handleEnded(e) {
+    const targetDeck = e.target === audioA ? 'A' : 'B';
+    if (targetDeck === activeDeck && !isTransitioning) {
+      doGaplessTransition();
+    }
   }
 
   function preloadNext(currentIdx, active) {
@@ -100,23 +128,14 @@
     }
   }
 
-  function handleTimeUpdate(e) {
-    const targetDeck = e.target === audioA ? 'A' : 'B';
-    if (targetDeck === activeDeck) {
-      if (!isDragging) time = e.target.currentTime;
-      duration = e.target.duration;
-      if (duration > 0 && (duration - time) <= 0.25 && !isTransitioning) {
-        doGaplessTransition();
-      }
-    }
-  }
-
   function doGaplessTransition() {
     if ($currentIndex >= $playlist.length - 1) return; 
     isTransitioning = true;
     const nextIdx = $currentIndex + 1;
     playingPath = $playlist[nextIdx].path;
     
+    hasPreloadedNext = false;
+
     if (activeDeck === 'A') {
       activeDeck = 'B';
       if (audioB) audioB.play().catch(e => console.error(e));
@@ -129,7 +148,6 @@
     currentSong.set(playingPath);
     currentTitle.set($playlist[nextIdx].title);
     
-    preloadNext(nextIdx, activeDeck);
     setTimeout(() => { isTransitioning = false; }, 1000); 
   }
 
@@ -173,8 +191,8 @@
   class="fixed bottom-0 left-0 w-full p-4 md:p-6 flex flex-col items-center justify-between z-50 transition-all duration-1000 border-t border-white/10 backdrop-blur-2xl"
   style={`background: linear-gradient(180deg, rgba(${playerRgb}, 0.15) 0%, rgba(20, 20, 24, 0.95) 100%); box-shadow: 0 -20px 60px rgba(${playerRgb}, 0.15); border-top-color: rgba(${playerRgb}, 0.6);`}
 >
-  <audio bind:this={audioA} preload="auto" on:timeupdate={handleTimeUpdate} on:play={() => { paused = false; $isPlaying = true; }} on:pause={() => { paused = true; $isPlaying = false; }} class="hidden"></audio>
-  <audio bind:this={audioB} preload="auto" on:timeupdate={handleTimeUpdate} on:play={() => { paused = false; $isPlaying = true; }} on:pause={() => { paused = true; $isPlaying = false; }} class="hidden"></audio>
+  <audio bind:this={audioA} preload="auto" on:timeupdate={handleTimeUpdate} on:ended={handleEnded} on:play={() => { paused = false; $isPlaying = true; }} on:pause={() => { paused = true; $isPlaying = false; }} class="hidden"></audio>
+  <audio bind:this={audioB} preload="auto" on:timeupdate={handleTimeUpdate} on:ended={handleEnded} on:play={() => { paused = false; $isPlaying = true; }} on:pause={() => { paused = true; $isPlaying = false; }} class="hidden"></audio>
 
   {#if $currentSong}
     <div class="flex flex-col md:flex-row items-center w-full max-w-6xl gap-4 md:gap-8">
