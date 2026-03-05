@@ -106,7 +106,7 @@
         hasPreloadedNext = true;
       }
 
-      if (duration > 0 && (duration - time) <= 0.4 && !isTransitioning) {
+      if (duration > 0 && (duration - time) <= 0.25 && !isTransitioning) {
         doGaplessTransition();
       }
     }
