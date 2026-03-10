@@ -152,7 +152,7 @@
           on:click={() => handleTrackClick(index, track.path)}
           class="group flex items-center w-full p-3 hover:bg-white/10 rounded-xl transition-colors text-left cursor-pointer border border-transparent hover:border-white/5"
         >
-          <div class="w-10 flex-shrink-0 text-center text-gray-400 font-medium relative h-6">
+          <div class="w-10 shrink-0 text-center text-gray-400 font-medium relative h-6">
             <span 
               class={`group-hover:hidden text-xs absolute inset-0 flex items-center justify-center ${track.path === $currentSong ? 'font-black' : ''}`}
               style={track.path === $currentSong ? `color: rgb(${pageRgb});` : ''}
