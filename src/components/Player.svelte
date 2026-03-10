@@ -208,12 +208,20 @@
       </div>
 
       <div class="flex items-center gap-3 shrink-0">
-        <button on:click={playPrev} class="text-gray-300 hover:text-white transition-colors disabled:opacity-30 cursor-pointer" disabled={$currentIndex === 0}>
+        <button 
+          on:click={playPrev} 
+          aria-label="Previous Track"
+          title="Previous Track"
+          class="text-gray-300 hover:text-white transition-colors disabled:opacity-30 cursor-pointer" 
+          disabled={$currentIndex === 0}
+        >
           <svg viewBox="0 0 24 24" fill="currentColor" class="w-8 h-8"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
         </button>
 
         <button 
           on:click={togglePause} 
+          aria-label={$isPlaying ? 'Pause' : 'Play'}
+          title={$isPlaying ? 'Pause' : 'Play'}
           class="w-12 h-12 flex items-center justify-center rounded-full text-white hover:scale-105 transition-transform shadow-md cursor-pointer"
           style={`background-color: rgb(${playerRgb}); box-shadow: 0 4px 15px rgba(${playerRgb}, 0.4);`}
         >
@@ -224,7 +232,13 @@
           {/if}
         </button>
 
-        <button on:click={playNext} class="text-gray-300 hover:text-white transition-colors disabled:opacity-30 cursor-pointer" disabled={$currentIndex === $playlist.length - 1}>
+        <button 
+          on:click={playNext} 
+          aria-label="Next Track"
+          title="Next Track"
+          class="text-gray-300 hover:text-white transition-colors disabled:opacity-30 cursor-pointer" 
+          disabled={$currentIndex === $playlist.length - 1}
+        >
           <svg viewBox="0 0 24 24" fill="currentColor" class="w-8 h-8"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
         </button>
       </div>
